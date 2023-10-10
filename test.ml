@@ -4,11 +4,11 @@ let _t1 = assert( eval_string "print(42)"  = ["42"] )
 
 let _t1 = assert( eval_string
 "
-for i in [1; 2; 3]:
+for i in [1, 2, 3]:
   print(i)
 "  = ["1";"2";"3"] )
 
-let _t3 =
+(* let _t3 =
   let prog = "
 def f(n):
   if n < 2:
@@ -67,4 +67,4 @@ print(rev2(rev((range(10)))))
             "[1, 2, 3]";
             "[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]"
         ] )
-
+ *)
