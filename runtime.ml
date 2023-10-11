@@ -34,8 +34,10 @@ let string_of_ptype = function
   | PNone -> "<none>"
 
 let rec plist_cmp a b =
+  let cmp_size = compare (Array.length a) (Array.length b) in
   let rec loop i =
-    if i >= Array.length a then 0
+    if i >= Array.length a then if cmp_size = 0 then 0 else 1
+    else if i >= Array.length b && cmp_size < 0 then -1
     else
       match (a.(i), b.(i)) with
       | PInt x, PInt y ->
@@ -46,6 +48,9 @@ let rec plist_cmp a b =
           if v < 0 then -1 else if v > 0 then 1 else loop (i + 1)
       | PList x, PList y ->
           let v = plist_cmp x y in
+          if v < 0 then -1 else if v > 0 then 1 else loop (i + 1)
+      | PStr x, PStr y ->
+          let v = compare x y in
           if v < 0 then -1 else if v > 0 then 1 else loop (i + 1)
       | PVoid, PVoid ->
           let v = compare a.(i) b.(i) in
@@ -60,8 +65,7 @@ let rec plist_cmp a b =
                ^ string_of_ptype b.(i)
                ^ " are incomparable"))
   in
-  let v = compare (Array.length a) (Array.length b) in
-  if v < 0 then -1 else if v > 0 then 1 else loop 0
+  loop 0
 
 let eval_binop_int a b = function
   | Add -> PInt (a + b)
@@ -100,15 +104,18 @@ let eval_binop_str a b = function
   | Eq -> PBool (a = b)
   | _ -> raise (Error "Unsupported operand for <string>")
 
-let eval_binop_list a b = function
+let eval_binop_list a b =
+  print_int(plist_cmp a b);
+  function
   | Add -> PList (Array.append a b)
-  | Leq -> PBool (plist_cmp a b >= 0)
-  | Le -> PBool (plist_cmp a b > 0)
-  | Geq -> PBool (plist_cmp a b <= 0)
-  | Ge -> PBool (plist_cmp a b < 0)
+  | Leq -> PBool (plist_cmp a b <= 0)
+  | Le -> PBool (plist_cmp a b < 0)
+  | Geq -> PBool (plist_cmp a b >= 0)
+  | Ge -> PBool (plist_cmp a b > 0)
   | Neq -> PBool (plist_cmp a b != 0)
   | Eq -> PBool (plist_cmp a b = 0)
   | _ -> raise (Error "Unsupported operand for <list>")
+
 
 let eval_binop_non a b binop =
   match (a, b) with
