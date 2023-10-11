@@ -8,7 +8,7 @@ for i in [1, 2, 3]:
   print(i)
 "  = ["1";"2";"3"] )
 
-(* let _t3 =
+let _t3 =
   let prog = "
 def f(n):
   if n < 2:
@@ -20,7 +20,7 @@ print(f(10))
   in
   assert( eval_string prog  = ["55"] )
 
-let _t4 =
+(* let _t4 =
   let prog = "
 def range(n):
   if n>0:

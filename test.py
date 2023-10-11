@@ -4,7 +4,7 @@ println(True)
 println("a" + "b")
 println("a" + "1")
 println([1,2,3,4])
-println([1,2] + [3,4])
+println([1,2] < ["3","4"])
 
 for i in [1, 2, 3]:
   print(i)
