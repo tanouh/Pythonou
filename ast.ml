@@ -11,6 +11,7 @@ and stmt_node =
   | Sval of expr 
   | Sif of expr*stmt
   | Sifelse of expr*stmt*stmt
+  | Swhile of expr*stmt
 and const = 
   | Int of string
   | Str of string

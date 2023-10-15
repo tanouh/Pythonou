@@ -216,6 +216,14 @@ let eval program_ast out =
     | PBool b -> if b then (eval_stmt locvars s) else (eval_stmt locvars e)
     |_ -> raise (Error "If-cond not a boolean")
   )
+  and eval_while locvars e s = (
+    match (eval_expr locvars e) with
+    | PBool b -> if b then 
+      ((eval_stmt locvars s); 
+      eval_while locvars e s)
+      else ()
+    |_ -> raise (Error "while - not a defined statement")
+  )
   and eval_stmt locvars (stmt_node, pos) =
     match stmt_node with
     | Sval e ->
@@ -229,6 +237,7 @@ let eval program_ast out =
         eval_loop locvars i stmt 0 (eval_expr locvars expr)
     | Sif (expr, s) -> eval_if locvars expr s
     | Sifelse (expr, s, e) -> eval_if_else  locvars expr s e
+    | Swhile(expr, s) -> eval_while locvars expr s
     | Sreturn expr -> raise (Return ((eval_expr locvars expr)))
     (* | _ -> raise (RuntimeError ("Not implemented stmt !", pos)) *)
   and call locvars fct args =

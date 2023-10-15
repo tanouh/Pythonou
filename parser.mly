@@ -7,7 +7,7 @@
 %token <string> CST
 %token <string> STR
 %token <string> IDENT
-%token AND DEF FOR TRUE FALSE IN NOT OR RETURN NONE IF ELSE
+%token AND DEF FOR TRUE FALSE IN NOT OR RETURN NONE IF ELSE WHILE
 %token EOF COLON
 %token LP RP COMMA LB RB
 %token PLUS MINUS TIMES DIV MOD
@@ -60,6 +60,7 @@ stmt:
 | FOR ; s = IDENT ; IN ; e = expr ; COLON ; b = suite  {Sfor(s,e,b), $startpos}
 | IF ; cond = expr ; COLON ; b = suite  {Sif(cond, b), $startpos} 
 | IF ; cond = expr ; COLON ; b = suite ; ELSE ; COLON ; e = suite  {Sifelse(cond,b,e), $startpos}
+| WHILE ; cond = expr ; COLON; b = suite {Swhile(cond,b), $startpos}
 ;
 
 expr:
