@@ -20,7 +20,7 @@ print(f(10))
   in
   assert( eval_string prog  = ["55"] )
 
-(*let _t4 =
+let _t4 =
   let prog = "
 def range(n):
   if n>0:
@@ -67,4 +67,4 @@ print(rev2(rev((range(10)))))
             "[1, 2, 3]";
             "[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]"
         ] )
- *)
+
