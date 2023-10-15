@@ -8,11 +8,9 @@ type ptype =
   | PVoid
   | PNone
 
-
 exception Error of string
 exception RuntimeError of string * Lexing.position
 exception Return of ptype
-
 
 module StrMap = Map.Make (String)
 
@@ -35,6 +33,16 @@ let string_of_ptype = function
   | PStr _ -> "<string>"
   | PVoid -> "<void>"
   | PNone -> "<none>"
+
+let int_of_ptype t =
+  match t with
+  | PInt k -> k
+  | PBool b -> if b then 1 else 0
+  | PStr s -> int_of_char s.[0]
+  | _ ->
+      raise
+        (Error
+           ("The type " ^ string_of_ptype t ^ "cannot be converted as integer"))
 
 let rec plist_cmp a b =
   let cmp_size = compare (Array.length a) (Array.length b) in
@@ -108,7 +116,7 @@ let eval_binop_str a b = function
   | _ -> raise (Error "Unsupported operand for <string>")
 
 let eval_binop_list a b =
-  print_int(plist_cmp a b);
+  print_int (plist_cmp a b);
   function
   | Add -> PList (Array.append a b)
   | Leq -> PBool (plist_cmp a b <= 0)
@@ -118,7 +126,6 @@ let eval_binop_list a b =
   | Neq -> PBool (plist_cmp a b != 0)
   | Eq -> PBool (plist_cmp a b = 0)
   | _ -> raise (Error "Unsupported operand for <list>")
-
 
 let eval_binop_non a b binop =
   match (a, b) with
@@ -173,41 +180,66 @@ let build_const = function
   | Bool b -> PBool b
   | Non -> raise (Error "Unknown value")
 
-let assign locvars value = function
-  | Tab (_x, _e) -> raise (Error "Not implemented !")
-  | Var x -> Hashtbl.add locvars x value
-
-let eval_var locvars = function
-  | Var e ->
-      if Hashtbl.mem locvars e then Hashtbl.find locvars e
-      else if Hashtbl.mem gvars e then Hashtbl.find gvars e
-      else raise (Error ("Undefined variable \""^e^"\"\n"))
-  | _ -> raise (Error "not implemented")
+let eval_tab arr i =
+  match (arr, i) with
+  | PList arr, PInt i ->
+      if Array.length arr < abs i then raise (Error "Indice out of bounds")
+      else if i < 0 then arr.(Array.length arr + i)
+      else arr.(i)
+  | PList arr, PBool b ->
+      if b then
+        if Array.length arr = 1 then raise (Error "Indice out of bounds")
+        else arr.(1)
+      else arr.(2)
+  | PStr s, PInt i ->
+      if String.length s < abs i then raise (Error "Indice out of bounds")
+      else if i < 0 then
+        PStr (String.sub s (String.length s + i - 1) (String.length s + i))
+      else PStr (String.sub s i (i + 1))
+  | PStr s, PBool b ->
+      if b then
+        if String.length s = 1 then raise (Error "Indice out of bounds")
+        else PStr (String.sub s 1 2)
+      else PStr (String.sub s 0 1)
+  | _, _ ->
+      raise
+        (Error ("The type " ^ string_of_ptype arr ^ " is not subscriptable"))
 
 
 let eval program_ast out =
   let rec eval_expr locvars = function
-    | Ecall (fct, args) -> (try let _ = (call locvars fct args) in PVoid with Return ret -> ret)
+    | Ecall (fct, args) -> (
+        try
+          let _ = call locvars fct args in
+          PVoid
+        with Return ret -> ret)
     | Const k -> build_const k
     | Op (binop, a, b) ->
         eval_binop (eval_expr locvars a) (eval_expr locvars b) binop
     | List l -> PList (Array.map (eval_expr locvars) (Array.of_list l))
-    | Val v -> eval_var locvars v
+    | Val v -> eval_val locvars v
     | _ -> raise (Error "not implemented !")
+  and eval_val locvars = function
+    | Var e ->
+        if Hashtbl.mem locvars e then Hashtbl.find locvars e
+        else if Hashtbl.mem gvars e then Hashtbl.find gvars e
+        else raise (Error ("Undefined variable \"" ^ e ^ "\"\n"))
+    | Tab (l, e) -> eval_tab (eval_val locvars l) (eval_expr locvars e)
   and eval_stmt_block locvars = function
     | [] -> ()
-    | stmt :: b -> (eval_stmt locvars stmt);
-    eval_stmt_block locvars b
+    | stmt :: b ->
+        eval_stmt locvars stmt;
+        eval_stmt_block locvars b
   and eval_loop locvars i stmt j = function
     | PList l ->
         if j >= Array.length l then ()
-        else
-          (assign locvars l.(j) (Var i);
-          eval_stmt  locvars stmt;
+        else (
+          assign locvars l.(j) (Var i);
+          eval_stmt locvars stmt;
           eval_loop locvars i stmt (j + 1) (PList l))
     | _ -> raise (Error "The given type is not iterable")
   and eval_if locvars expr body = (
-    match (eval_expr locvars expr) with 
+    match (eval_expr locvars expr) with
     | PBool b -> if b then (eval_stmt locvars body) else ()
     | _ -> raise (Error "If-cond not a boolean")
   )
@@ -218,8 +250,8 @@ let eval program_ast out =
   )
   and eval_while locvars e s = (
     match (eval_expr locvars e) with
-    | PBool b -> if b then 
-      ((eval_stmt locvars s); 
+    | PBool b -> if b then
+      ((eval_stmt locvars s);
       eval_while locvars e s)
       else ()
     |_ -> raise (Error "while - not a defined statement")
@@ -230,7 +262,8 @@ let eval program_ast out =
         let _ =
           try eval_expr locvars e
           with Error e -> raise (RuntimeError (e, pos))
-        in ()
+        in
+        ()
     | Sblock b -> eval_stmt_block locvars b
     | Sassign (x, value) -> assign locvars (eval_expr locvars value) x
     | Sfor (i, expr, stmt) ->
@@ -246,19 +279,32 @@ let eval program_ast out =
     | "print" -> out (print_ptype (List.hd pargs));
     | "println" -> out (print_ptype (List.hd pargs) ^ "\n");
     | "type" -> raise (Return (PStr (string_of_ptype (List.hd pargs))))
-    | "len" ->  raise (Return (PInt (len (List.hd pargs))))
+    | "len" -> raise (Return (PInt (len (List.hd pargs))))
     (* | "f" -> out "hard fun : f\n"; raise (Return (PInt 5)) *)
     | fct_name ->
         if Hashtbl.mem defs fct_name then
-          let fct = (Hashtbl.find defs fct_name) in
-          let fctvars = List.combine fct.args pargs |> List.to_seq |> Hashtbl.of_seq in
-          let _ = eval_stmt fctvars (fct.body); in ()
+          let fct = Hashtbl.find defs fct_name in
+          let fctvars =
+            List.combine fct.args pargs |> List.to_seq |> Hashtbl.of_seq
+          in
+          let _ = eval_stmt fctvars fct.body in
+          ()
         else raise (Error "Undefined function")
-
+  and assign locvars value = function
+    | Tab (x, e) -> (
+      let rec loop = function
+      | Tab(x,e) -> (match (loop x).(int_of_ptype (eval_expr locvars e)) with |PList arr -> arr | _ -> raise (Error "type"))
+      | Var t -> match Hashtbl.find locvars t with |PList arr -> arr | _ -> raise (Error "type")
+    in
+      (loop x).(int_of_ptype (eval_expr locvars e)) <- value
+    )
+    | Var x -> Hashtbl.add locvars x value
   in
+
   (* FILL ME *)
   let run (_program : Ast.prog) =
     build_functions defs program_ast.defs;
-    let _ = call (Hashtbl.create 5) "-#-main-#-" [] in ()
+    let _ = call (Hashtbl.create 5) "-#-main-#-" [] in
+    ()
   in
-  run program_ast;
+  run program_ast
