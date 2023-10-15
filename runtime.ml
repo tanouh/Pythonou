@@ -213,7 +213,7 @@ let eval program_ast out =
   )
   and eval_if_else locvars expr s e = (
     match (eval_expr locvars expr) with
-    | PBool b -> if b then (eval_stmt locvars s) else ()
+    | PBool b -> if b then (eval_stmt locvars s) else (eval_stmt locvars e)
     |_ -> raise (Error "If-cond not a boolean")
   )
   and eval_stmt locvars (stmt_node, pos) =
@@ -230,10 +230,10 @@ let eval program_ast out =
     | Sif (expr, s) -> eval_if locvars expr s
     | Sifelse (expr, s, e) -> eval_if_else  locvars expr s e
     | Sreturn expr -> raise (Return ((eval_expr locvars expr)))
-    | _ -> raise (RuntimeError ("Not implemented stmt !", pos))
+    (* | _ -> raise (RuntimeError ("Not implemented stmt !", pos)) *)
   and call locvars fct args =
     let pargs = List.map (eval_expr locvars) args in
-    match fct_name with
+    match fct with
     | "print" -> out (print_ptype (List.hd pargs));
     | "println" -> out (print_ptype (List.hd pargs) ^ "\n");
     | "type" -> raise (Return (PStr (string_of_ptype (List.hd pargs))))
