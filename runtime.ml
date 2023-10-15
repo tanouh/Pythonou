@@ -172,6 +172,11 @@ let rec print_ptype t =
   | PStr s -> s
   | _ -> raise (Error ("The type " ^ string_of_ptype t ^ " is not printable"))
 
+let rec print_args out = function
+  | [] -> out
+  | [x] -> out ^ print_ptype x
+  | x :: l -> print_args (out ^ print_ptype x ^ " ") l
+
 let range t =
   match t with
   | PInt k -> PList (Array.init k (fun i -> PInt i))
@@ -231,7 +236,7 @@ let eval program_ast out =
         if Hashtbl.mem locvars e then Hashtbl.find locvars e
         else if Hashtbl.mem gvars e then Hashtbl.find gvars e
         else raise (Error ("Undefined variable \"" ^ e ^ "\"\n"))
-    | Tab (l, e) -> eval_tab (eval_val locvars l) (eval_expr locvars e)
+    | Tab (l, e) -> eval_tab (eval_expr locvars l) (eval_expr locvars e)
   and eval_stmt_block locvars = function
     | [] -> ()
     | stmt :: b ->
@@ -300,12 +305,11 @@ let eval program_ast out =
     | Sifelse (expr, s, e) -> eval_if_else locvars expr s e
     | Swhile (expr, s) -> eval_while locvars expr s
     | Sreturn expr -> raise (Return (eval_expr locvars expr))
-    (* | _ -> raise (RuntimeError ("Not implemented stmt !", pos)) *)
   and call locvars fct args =
     let pargs = List.map (eval_expr locvars) args in
     match fct with
-    | "print" -> out (print_ptype (List.hd pargs))
-    | "println" -> out (print_ptype (List.hd pargs) ^ "\n")
+    | "print" -> out (print_args "" pargs)
+    | "println" -> out (print_args "" pargs ^ "\n")
     | "type" -> raise (Return (PStr (string_of_ptype (List.hd pargs))))
     | "len" -> raise (Return (PInt (len (List.hd pargs))))
     (* | "range" -> raise (Return (range (List.hd pargs))) *)
@@ -321,14 +325,17 @@ let eval program_ast out =
   and assign locvars value = function
     | Tab (x, e) ->
         let rec loop = function
-          | Tab (x, e) -> (
-              match (loop x).(int_of_ptype (eval_expr locvars e)) with
-              | PList arr -> arr
-              | _ -> raise (Error "type"))
-          | Var t -> (
-              match Hashtbl.find locvars t with
-              | PList arr -> arr
-              | _ -> raise (Error "type"))
+          | Val x -> (
+              match x with
+              | Tab (x, e) -> (
+                  match (loop x).(int_of_ptype (eval_expr locvars e)) with
+                  | PList arr -> arr
+                  | _ -> raise (Error "type"))
+              | Var t -> (
+                  match Hashtbl.find locvars t with
+                  | PList arr -> arr
+                  | _ -> raise (Error "type")))
+          | _ -> raise (Error "test")
         in
         (loop x).(int_of_ptype (eval_expr locvars e)) <- value
     | Var x -> Hashtbl.add locvars x value

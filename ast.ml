@@ -3,23 +3,23 @@
 type pos = Lexing.position
 
 type stmt = stmt_node*pos
-and stmt_node =  
+and stmt_node =
   | Sfor of string*expr*stmt
-  | Sblock of stmt list 
+  | Sblock of stmt list
   | Sreturn of expr
-  | Sassign of left_value*expr 
-  | Sval of expr 
+  | Sassign of left_value*expr
+  | Sval of expr
   | Sif of expr*stmt
   | Sifelse of expr*stmt*stmt
   | Swhile of expr*stmt
-and const = 
+and const =
   | Int of string
   | Str of string
   | Bool of bool
   | Non
 
-and left_value = 
-  | Tab of left_value*expr
+and left_value =
+  | Tab of expr*expr
   | Var of string
 
 and expr =
@@ -33,7 +33,7 @@ and expr =
 and binop = Add | Sub | Mul | Div | Mod | Leq | Le | Geq | Ge | Neq | Eq | And | Or
 
 type def = { name : string ; body : stmt ; args : string list ; }
-and prog = { defs : def list ; } 
+and prog = { defs : def list ; }
 
 let str_op = function
   | Add -> "Add"

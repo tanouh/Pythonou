@@ -1,17 +1,17 @@
 {
   open Lexing
   open Parser
-   
+
   exception Lexing_error of char
-    
+
   let kwd_tbl = ["and",AND; "def",DEF; "for",FOR; "True",TRUE;"False",FALSE;
-                 "in",IN;"not",NOT; "or",OR ;"return",RETURN; "None",NONE ; "if", IF; 
+                 "in",IN;"not",NOT; "or",OR ;"return",RETURN; "None",NONE ; "if", IF;
                  "else", ELSE; "while", WHILE]
   let id_or_kwd s = try List.assoc s kwd_tbl with _ -> IDENT s
 
   let newline lexbuf =
     let pos = lexbuf.lex_curr_p in
-    lexbuf.lex_curr_p <- 
+    lexbuf.lex_curr_p <-
       { pos with pos_lnum = pos.pos_lnum + 1; pos_bol = pos.pos_cnum }
 
   let pile = ref [0]
@@ -37,7 +37,7 @@
                     | c -> raise (Lexing_error(c)) in
           c::foo (i+2)
         else s.[i]::foo(i+1)
-     in            
+     in
      foo 0 |> List.map (String.make 1)|> String.concat ""
 }
 
@@ -76,12 +76,12 @@ and token = parse
   | '>'  { [GE] }
   | integer as s { [CST (s)] }
   | eof     { [NEWLINE;EOF] }
-  | '\"' (chaine as s) '\"' { [STR(desescape s)] }  
+  | '\"' (chaine as s) '\"' { [STR(desescape s)] }
   | _ as c  { raise (Lexing_error c) }
 
 
 {
-  let rec take_buffered = 
+  let rec take_buffered =
     let buffer = ref None in
     fun lexbuf ->
       match !buffer with

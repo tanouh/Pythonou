@@ -3,7 +3,7 @@
 %{
   open Ast;;
 %}
- 
+
 %token <string> CST
 %token <string> STR
 %token <string> IDENT
@@ -20,7 +20,7 @@
 %left AND
 %nonassoc NOT
 %nonassoc LE LEQ GE GEQ EQQ NEQ
-%left PLUS MINUS 
+%left PLUS MINUS
 %left TIMES DIV MOD
 %nonassoc uminus
 
@@ -32,11 +32,11 @@
 
 %%
 
-file: NEWLINE? ; d = def* ;s = stmt+; NEWLINE ? ;EOF 
-  {{defs = {name="-#-main-#-";body=Sblock(s),$startpos;args=[]}::d }} 
+file: NEWLINE? ; d = def* ;s = stmt+; NEWLINE ? ;EOF
+  {{defs = {name="-#-main-#-";body=Sblock(s),$startpos;args=[]}::d }}
 ;
-  
-def: DEF ; nom = IDENT ; LP ; args = separated_list(COMMA,IDENT) ; RP ; COLON ; bod =  suite  
+
+def: DEF ; nom = IDENT ; LP ; args = separated_list(COMMA,IDENT) ; RP ; COLON ; bod =  suite
     {{name = nom ; args = args ; body = bod }}
 ;
 
@@ -46,19 +46,19 @@ suite: b = simple_stmt ; NEWLINE { b }
 
 left_value:
 | s = IDENT { Var(s) }
-| l = left_value; LB ; e = expr ; RB { Tab(l,e) }
+| l = expr; LB ; e = expr ; RB { Tab(l,e) }
 ;
 
-simple_stmt: 
-  | RETURN ; e = expr { Sreturn(e), $startpos } 
-  | l = left_value ; EQ ; e = expr { Sassign(l,e), $startpos } 
-  | e = expr { Sval(e), $startpos } 
+simple_stmt:
+  | RETURN ; e = expr { Sreturn(e), $startpos }
+  | l = left_value ; EQ ; e = expr { Sassign(l,e), $startpos }
+  | e = expr { Sval(e), $startpos }
 ;
 
 stmt:
 | s = simple_stmt ; NEWLINE  { s }
 | FOR ; s = IDENT ; IN ; e = expr ; COLON ; b = suite  {Sfor(s,e,b), $startpos}
-| IF ; cond = expr ; COLON ; b = suite  {Sif(cond, b), $startpos} 
+| IF ; cond = expr ; COLON ; b = suite  {Sif(cond, b), $startpos}
 | IF ; cond = expr ; COLON ; b = suite ; ELSE ; COLON ; e = suite  {Sifelse(cond,b,e), $startpos}
 | WHILE ; cond = expr ; COLON; b = suite {Swhile(cond,b), $startpos}
 ;
@@ -67,8 +67,8 @@ expr:
 | c = const                      { Const(c) }
 | l = left_value                 { Val(l)}
 | e1 = expr o = op e2 = expr     { Op(o,e1,e2) }
-| MINUS e = expr %prec uminus    { Moins(e) } 
-| NOT e = expr                   { Not(e) } 
+| MINUS e = expr %prec uminus    { Moins(e) }
+| NOT e = expr                   { Not(e) }
 | s = IDENT ; LP ; args = separated_list(COMMA,expr) ; RP { Ecall(s,args) }
 | LB ; args = separated_list(COMMA,expr) ; RB { List(args)}
 | LP ; e = expr ; RP { e}
@@ -87,7 +87,7 @@ expr:
 | NEQ   { Neq }
 | EQQ   { Eq  }
 | AND   { And }
-| OR    { Or  } 
+| OR    { Or  }
 ;
 
 const:
