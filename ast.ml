@@ -9,6 +9,8 @@ and stmt_node =
   | Sreturn of expr
   | Sassign of left_value*expr 
   | Sval of expr 
+  | Sif of expr*stmt
+  | Sifelse of expr*stmt*stmt
 and const = 
   | Int of string
   | Str of string

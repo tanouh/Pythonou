@@ -184,6 +184,7 @@ let eval_var locvars = function
       else raise (Error ("Undefined variable \""^e^"\"\n"))
   | _ -> raise (Error "not implemented")
 
+
 let eval program_ast out =
   let rec eval_expr locvars = function
     | Ecall (fct, args) -> (try let _ = (call locvars fct args) in PVoid with Return ret -> ret)
@@ -205,6 +206,16 @@ let eval program_ast out =
           eval_stmt  locvars stmt;
           eval_loop locvars i stmt (j + 1) (PList l))
     | _ -> raise (Error "The given type is not iterable")
+  and eval_if locvars expr body = (
+    match (eval_expr locvars expr) with 
+    | PBool b -> if b then (eval_stmt locvars body) else ()
+    | _ -> raise (Error "If-cond not a boolean")
+  )
+  and eval_if_else locvars expr s e = (
+    match (eval_expr locvars expr) with
+    | PBool b -> if b then (eval_stmt locvars s) else ()
+    |_ -> raise (Error "If-cond not a boolean")
+  )
   and eval_stmt locvars (stmt_node, pos) =
     match stmt_node with
     | Sval e ->
@@ -216,8 +227,11 @@ let eval program_ast out =
     | Sassign (x, value) -> assign locvars (eval_expr locvars value) x
     | Sfor (i, expr, stmt) ->
         eval_loop locvars i stmt 0 (eval_expr locvars expr)
+    | Sif (expr, s) -> eval_if locvars expr s
+    | Sifelse (expr, s, e) -> eval_if_else  locvars expr s e
     | Sreturn expr -> raise (Return ((eval_expr locvars expr)))
-  and call locvars fct_name args =
+    | _ -> raise (RuntimeError ("Not implemented stmt !", pos))
+  and call locvars fct args =
     let pargs = List.map (eval_expr locvars) args in
     match fct_name with
     | "print" -> out (print_ptype (List.hd pargs));

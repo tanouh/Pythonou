@@ -5,7 +5,8 @@
   exception Lexing_error of char
     
   let kwd_tbl = ["and",AND; "def",DEF; "for",FOR; "True",TRUE;"False",FALSE;
-                 "in",IN;"not",NOT; "or",OR ;"return",RETURN; "None",NONE ]
+                 "in",IN;"not",NOT; "or",OR ;"return",RETURN; "None",NONE ; "if", IF; 
+                 "else", ELSE]
   let id_or_kwd s = try List.assoc s kwd_tbl with _ -> IDENT s
 
   let newline lexbuf =
