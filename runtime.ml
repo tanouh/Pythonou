@@ -1,8 +1,5 @@
 open Ast
 
-exception Error of string
-exception RuntimeError of string * Lexing.position
-
 type ptype =
   | PInt of int
   | PBool of bool
@@ -10,6 +7,12 @@ type ptype =
   | PStr of string
   | PVoid
   | PNone
+
+
+exception Error of string
+exception RuntimeError of string * Lexing.position
+exception Return of ptype
+
 
 module StrMap = Map.Make (String)
 
@@ -159,7 +162,7 @@ let rec print_ptype t =
   in
   match t with
   | PInt i -> string_of_int i
-  | PBool b -> string_of_bool b
+  | PBool b -> if b then "True" else "False"
   | PList l -> string_of_list l
   | PStr s -> s
   | _ -> raise (Error ("The type " ^ string_of_ptype t ^ " is not printable"))
@@ -172,18 +175,18 @@ let build_const = function
 
 let assign locvars value = function
   | Tab (_x, _e) -> raise (Error "Not implemented !")
-  | Var x -> StrMap.add x value locvars
+  | Var x -> Hashtbl.add locvars x value
 
 let eval_var locvars = function
   | Var e ->
-      if StrMap.mem e locvars then StrMap.find e locvars
+      if Hashtbl.mem locvars e then Hashtbl.find locvars e
       else if Hashtbl.mem gvars e then Hashtbl.find gvars e
-      else raise (Error "Undefined variable\n")
+      else raise (Error ("Undefined variable \""^e^"\"\n"))
   | _ -> raise (Error "not implemented")
 
 let eval program_ast out =
   let rec eval_expr locvars = function
-    | Ecall (fct, l) -> call locvars fct l
+    | Ecall (fct, args) -> (try let _ = (call locvars fct args) in PVoid with Return ret -> ret)
     | Const k -> build_const k
     | Op (binop, a, b) ->
         eval_binop (eval_expr locvars a) (eval_expr locvars b) binop
@@ -191,14 +194,16 @@ let eval program_ast out =
     | Val v -> eval_var locvars v
     | _ -> raise (Error "not implemented !")
   and eval_stmt_block locvars = function
-    | [] -> locvars
-    | stmt :: b -> eval_stmt_block (eval_stmt locvars stmt) b
+    | [] -> ()
+    | stmt :: b -> (eval_stmt locvars stmt);
+    eval_stmt_block locvars b
   and eval_loop locvars i stmt j = function
     | PList l ->
-        if j >= Array.length l then locvars
+        if j >= Array.length l then ()
         else
-          let locvars = eval_stmt (assign locvars l.(j) (Var i)) stmt in
-          eval_loop locvars i stmt (j + 1) (PList l)
+          (assign locvars l.(j) (Var i);
+          eval_stmt  locvars stmt;
+          eval_loop locvars i stmt (j + 1) (PList l))
     | _ -> raise (Error "The given type is not iterable")
   and eval_stmt locvars (stmt_node, pos) =
     match stmt_node with
@@ -206,35 +211,31 @@ let eval program_ast out =
         let _ =
           try eval_expr locvars e
           with Error e -> raise (RuntimeError (e, pos))
-        in
-        locvars
+        in ()
     | Sblock b -> eval_stmt_block locvars b
     | Sassign (x, value) -> assign locvars (eval_expr locvars value) x
     | Sfor (i, expr, stmt) ->
         eval_loop locvars i stmt 0 (eval_expr locvars expr)
-    (* | Sreturn e -> raise (RuntimeError ("Not implemented stmt !", pos)) *)
-    | _ -> raise (RuntimeError ("Not implemented stmt !", pos))
-  and call locvars fct args =
+    | Sreturn expr -> raise (Return ((eval_expr locvars expr)))
+  and call locvars fct_name args =
     let pargs = List.map (eval_expr locvars) args in
-    match fct with
-    | "print" ->
-        out (print_ptype (List.hd pargs));
-        PVoid
-    | "println" ->
-        out (print_ptype (List.hd pargs) ^ "\n");
-        PVoid
-    | "type" -> PStr (string_of_ptype (List.hd pargs))
-    | "len" -> PInt (len (List.hd pargs))
-    | fct ->
-        if Hashtbl.mem defs fct then
-          let _ = eval_stmt StrMap.empty (Hashtbl.find defs fct).body in
-          PVoid
-        else raise (Error ("The function " ^ fct ^ " is undefined"))
+    match fct_name with
+    | "print" -> out (print_ptype (List.hd pargs));
+    | "println" -> out (print_ptype (List.hd pargs) ^ "\n");
+    | "type" -> raise (Return (PStr (string_of_ptype (List.hd pargs))))
+    | "len" ->  raise (Return (PInt (len (List.hd pargs))))
+    (* | "f" -> out "hard fun : f\n"; raise (Return (PInt 5)) *)
+    | fct_name ->
+        if Hashtbl.mem defs fct_name then
+          let fct = (Hashtbl.find defs fct_name) in
+          let fctvars = List.combine fct.args pargs |> List.to_seq |> Hashtbl.of_seq in
+          let _ = eval_stmt fctvars (fct.body); in ()
+        else raise (Error "Undefined function")
+
   in
   (* FILL ME *)
   let run (_program : Ast.prog) =
     build_functions defs program_ast.defs;
-    let _ = call StrMap.empty "-#-main-#-" [] in
-    ()
+    let _ = call (Hashtbl.create 5) "-#-main-#-" [] in ()
   in
-  run program_ast
+  run program_ast;
