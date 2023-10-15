@@ -115,8 +115,7 @@ let eval_binop_str a b = function
   | Eq -> PBool (a = b)
   | _ -> raise (Error "Unsupported operand for <string>")
 
-let eval_binop_list a b =
-  function
+let eval_binop_list a b = function
   | Add -> PList (Array.append a b)
   | Leq -> PBool (plist_cmp a b <= 0)
   | Le -> PBool (plist_cmp a b < 0)
@@ -173,11 +172,15 @@ let rec print_ptype t =
   | PStr s -> s
   | _ -> raise (Error ("The type " ^ string_of_ptype t ^ " is not printable"))
 
-let range t = match t with
-  | PInt k -> PList (Array.init k (fun i -> PInt (i)))
-  | PBool b -> if b then PList ([|PInt(0)|]) else PList ([||])
-  | _ -> raise (Error ("The type " ^ string_of_ptype t ^ " cannot be interpreted as an integer"))
-
+let range t =
+  match t with
+  | PInt k -> PList (Array.init k (fun i -> PInt i))
+  | PBool b -> if b then PList [| PInt 0 |] else PList [||]
+  | _ ->
+      raise
+        (Error
+           ("The type " ^ string_of_ptype t
+          ^ " cannot be interpreted as an integer"))
 
 let build_const = function
   | Int k -> PInt (int_of_string k)
@@ -210,7 +213,6 @@ let eval_tab arr i =
       raise
         (Error ("The type " ^ string_of_ptype arr ^ " is not subscriptable"))
 
-
 let eval program_ast out =
   let rec eval_expr locvars = function
     | Ecall (fct, args) -> (
@@ -235,7 +237,8 @@ let eval program_ast out =
     | stmt :: b ->
         eval_stmt locvars stmt;
         eval_stmt_block locvars b
-  and eval_loop locvars i stmt j t = match t with
+  and eval_loop locvars i stmt j t =
+    match t with
     | PList l ->
         if j >= Array.length l then ()
         else (
@@ -243,27 +246,44 @@ let eval program_ast out =
           eval_stmt locvars stmt;
           eval_loop locvars i stmt (j + 1) (PList l))
     | _ -> raise (Error ("The  type " ^ string_of_ptype t ^ " is not iterable"))
-  and eval_if locvars expr body = (
-    let v = (eval_expr locvars expr) in
+  and eval_if locvars expr body =
+    let v = eval_expr locvars expr in
     match v with
-    | PBool b -> if b then (eval_stmt locvars body) else ()
-    | _ -> raise (Error ("The type " ^ string_of_ptype v ^ " cannot be interpreted as a boolean"))
-  )
-  and eval_if_else locvars expr s e = (
-    let v = (eval_expr locvars expr) in
+    | PBool b -> if b then eval_stmt locvars body else ()
+    | PInt k -> if k <> 0 then eval_stmt locvars body else ()
+    | _ ->
+        raise
+          (Error
+             ("The type " ^ string_of_ptype v
+            ^ " cannot be interpreted as a boolean"))
+  and eval_if_else locvars expr s e =
+    let v = eval_expr locvars expr in
     match v with
-    | PBool b -> if b then (eval_stmt locvars s) else (eval_stmt locvars e)
-    |_ -> raise (Error ("The type " ^ string_of_ptype v ^ " cannot be interpreted as a boolean"))
-  )
+    | PBool b -> if b then eval_stmt locvars s else eval_stmt locvars e
+    | PInt k -> if k <> 0 then eval_stmt locvars s else eval_stmt locvars e
+    | _ ->
+        raise
+          (Error
+             ("The type " ^ string_of_ptype v
+            ^ " cannot be interpreted as a boolean"))
   and eval_while locvars e s =
-  let v = (eval_expr locvars e) in
+    let v = eval_expr locvars e in
     match v with
-    | PBool b -> if b then
-      ((eval_stmt locvars s);
-      eval_while locvars e s)
-      else ()
-    |_ -> raise (Error ("The type " ^ string_of_ptype v ^ " cannot be interpreted as a boolean"))
-
+    | PBool b ->
+        if b then (
+          eval_stmt locvars s;
+          eval_while locvars e s)
+        else ()
+    | PInt k ->
+        if k <> 0 then (
+          eval_stmt locvars s;
+          eval_while locvars e s)
+        else ()
+    | _ ->
+        raise
+          (Error
+             ("The type " ^ string_of_ptype v
+            ^ " cannot be interpreted as a boolean"))
   and eval_stmt locvars (stmt_node, pos) =
     match stmt_node with
     | Sval e ->
@@ -277,15 +297,15 @@ let eval program_ast out =
     | Sfor (i, expr, stmt) ->
         eval_loop locvars i stmt 0 (eval_expr locvars expr)
     | Sif (expr, s) -> eval_if locvars expr s
-    | Sifelse (expr, s, e) -> eval_if_else  locvars expr s e
-    | Swhile(expr, s) -> eval_while locvars expr s
-    | Sreturn expr -> raise (Return ((eval_expr locvars expr)))
+    | Sifelse (expr, s, e) -> eval_if_else locvars expr s e
+    | Swhile (expr, s) -> eval_while locvars expr s
+    | Sreturn expr -> raise (Return (eval_expr locvars expr))
     (* | _ -> raise (RuntimeError ("Not implemented stmt !", pos)) *)
   and call locvars fct args =
     let pargs = List.map (eval_expr locvars) args in
     match fct with
-    | "print" -> out (print_ptype (List.hd pargs));
-    | "println" -> out (print_ptype (List.hd pargs) ^ "\n");
+    | "print" -> out (print_ptype (List.hd pargs))
+    | "println" -> out (print_ptype (List.hd pargs) ^ "\n")
     | "type" -> raise (Return (PStr (string_of_ptype (List.hd pargs))))
     | "len" -> raise (Return (PInt (len (List.hd pargs))))
     (* | "range" -> raise (Return (range (List.hd pargs))) *)
@@ -299,13 +319,18 @@ let eval program_ast out =
           ()
         else raise (Error "Undefined function")
   and assign locvars value = function
-    | Tab (x, e) -> (
-      let rec loop = function
-      | Tab(x,e) -> (match (loop x).(int_of_ptype (eval_expr locvars e)) with |PList arr -> arr | _ -> raise (Error "type"))
-      | Var t -> match Hashtbl.find locvars t with |PList arr -> arr | _ -> raise (Error "type")
-    in
-      (loop x).(int_of_ptype (eval_expr locvars e)) <- value
-    )
+    | Tab (x, e) ->
+        let rec loop = function
+          | Tab (x, e) -> (
+              match (loop x).(int_of_ptype (eval_expr locvars e)) with
+              | PList arr -> arr
+              | _ -> raise (Error "type"))
+          | Var t -> (
+              match Hashtbl.find locvars t with
+              | PList arr -> arr
+              | _ -> raise (Error "type"))
+        in
+        (loop x).(int_of_ptype (eval_expr locvars e)) <- value
     | Var x -> Hashtbl.add locvars x value
   in
 
