@@ -7,7 +7,26 @@ def range(n):
   return []
 
 def g(x):
-  print(x)
+  println(x)
+
+
+def f2():
+    a=x+1
+    return a
+
+def h2():
+    x=x+1
+    println("x de h2 =", x)
+    return x
+
+def g2():
+    x=1
+    return x
+
+
+
+
+
 
 
 println((42 * 5) - (10 * 2) / (3 % 5))
@@ -49,3 +68,16 @@ println([0,1][1])
 
 println(42)
 println("Hello", "World!")
+println(f(1))
+if x > 0:
+   x = x + 10
+   println(x)
+println(x)
+
+x=42
+println(f2())
+println(x)
+println(g2())
+println(x)
+println(h2())
+println(x)

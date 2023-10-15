@@ -174,7 +174,7 @@ let rec print_ptype t =
 
 let rec print_args out = function
   | [] -> out
-  | [x] -> out ^ print_ptype x
+  | [ x ] -> out ^ print_ptype x
   | x :: l -> print_args (out ^ print_ptype x ^ " ") l
 
 let range t =
@@ -219,7 +219,8 @@ let eval_tab arr i =
         (Error ("The type " ^ string_of_ptype arr ^ " is not subscriptable"))
 
 let eval program_ast out =
-  let rec eval_expr locvars = function
+  let rec eval_expr locvars =
+    function
     | Ecall (fct, args) -> (
         try
           let _ = call locvars fct args in
@@ -232,10 +233,15 @@ let eval program_ast out =
     | Val v -> eval_val locvars v
     | _ -> raise (Error "not implemented !")
   and eval_val locvars = function
-    | Var e ->
-        if Hashtbl.mem locvars e then Hashtbl.find locvars e
-        else if Hashtbl.mem gvars e then Hashtbl.find gvars e
-        else raise (Error ("Undefined variable \"" ^ e ^ "\"\n"))
+    | Var e -> (
+        match locvars with
+        | None ->
+            if Hashtbl.mem gvars e then Hashtbl.find gvars e
+            else raise (Error ("Undefined variable \"" ^ e ^ "\"\n"))
+        | Some locvars ->
+            if Hashtbl.mem locvars e then Hashtbl.find locvars e
+            else if Hashtbl.mem gvars e then Hashtbl.find gvars e
+            else raise (Error ("Undefined variable \"" ^ e ^ "\"\n")))
     | Tab (l, e) -> eval_tab (eval_expr locvars l) (eval_expr locvars e)
   and eval_stmt_block locvars = function
     | [] -> ()
@@ -312,6 +318,7 @@ let eval program_ast out =
     | "println" -> out (print_args "" pargs ^ "\n")
     | "type" -> raise (Return (PStr (string_of_ptype (List.hd pargs))))
     | "len" -> raise (Return (PInt (len (List.hd pargs))))
+    | "-#-main-#-" -> let fct = Hashtbl.find defs "-#-main-#-" in eval_stmt None fct.body
     (* | "range" -> raise (Return (range (List.hd pargs))) *)
     | fct_name ->
         if Hashtbl.mem defs fct_name then
@@ -319,7 +326,7 @@ let eval program_ast out =
           let fctvars =
             List.combine fct.args pargs |> List.to_seq |> Hashtbl.of_seq
           in
-          let _ = eval_stmt fctvars fct.body in
+          let _ = eval_stmt (Some fctvars) fct.body in
           ()
         else raise (Error "Undefined function")
   and assign locvars value = function
@@ -331,20 +338,23 @@ let eval program_ast out =
                   match (loop x).(int_of_ptype (eval_expr locvars e)) with
                   | PList arr -> arr
                   | _ -> raise (Error "type"))
-              | Var t -> (
-                  match Hashtbl.find locvars t with
+              | Var _ -> (
+                  match eval_val locvars x with
                   | PList arr -> arr
                   | _ -> raise (Error "type")))
           | _ -> raise (Error "test")
         in
         (loop x).(int_of_ptype (eval_expr locvars e)) <- value
-    | Var x -> Hashtbl.add locvars x value
+    | Var x -> (
+        match locvars with
+        | None -> Hashtbl.add gvars x value
+        | Some locvars -> Hashtbl.add locvars x value)
   in
 
   (* FILL ME *)
   let run (_program : Ast.prog) =
     build_functions defs program_ast.defs;
-    let _ = call (Hashtbl.create 5) "-#-main-#-" [] in
+    let _ = call None "-#-main-#-" [] in
     ()
   in
   run program_ast
